@@ -82,14 +82,14 @@ namespace VOIP_WPF
 
                 capture.DataAvailable += (s, e) =>
                 {
-                //save the recorded audio
-                w.Write(e.Data, e.Offset, e.ByteCount);
+                    //save the recorded audio
+                    w.Write(e.Data, e.Offset, e.ByteCount);
 
-                //Send into Udp
-                udpClient.Send(e.Data, e.ByteCount);
+                    //Send into Udp
+                    udpClient.Send(e.Data, e.ByteCount);
 
-                //log
-                //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
+                    //log
+                    //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
                 };
 
                 //start recording
