@@ -254,8 +254,8 @@ namespace VOIP_WPF
             //StopThreads:
             try
             {
-                senderThread.Abort();
-                senderThread.Abort();
+                if(senderThread.IsAlive) senderThread.Abort();
+                if(receiverThread.IsAlive) receiverThread.Abort();
             }
             catch (Exception ex) { Console.WriteLine("#ERROR : " + ex.StackTrace); }
         }
