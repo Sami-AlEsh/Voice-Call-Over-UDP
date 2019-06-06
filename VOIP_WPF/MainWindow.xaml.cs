@@ -107,7 +107,7 @@ namespace VOIP_WPF
             try
             {
                 //Start listening on port 1500.
-                udpClient = new UdpClient("192.168.1.107", 1550);
+                udpClient = new UdpClient("192.168.1.105", 1550);
 
                 receiverThread = new Thread(new ThreadStart(Receive));
                 receiverThread.Start();
