@@ -45,15 +45,6 @@ namespace VOIP_WPF
         private void Connect_Btn(object sender, RoutedEventArgs e)
         {
             InitializeCall();
-            
-            
-            ////stop recording
-            ////capture.Stop();
-
-            //var t1 = new Thread(new ThreadStart(PlayASound));
-            //var t2 = new Thread(new ThreadStart(StopPlaying));
-            //t1.Start();
-            //t2.Start();
         }
 
         #region CSCore
