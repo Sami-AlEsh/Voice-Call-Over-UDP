@@ -23,9 +23,9 @@ namespace VOIP_WPF
     public partial class MainWindow : Window
     {
         UdpClient udpClient;
-        Socket tcpClient;
-        //Socket 
 
+        Thread senderThread;
+        Thread receiverThread;
         //Record
         WasapiCapture capture;
         //Listen
@@ -47,6 +47,105 @@ namespace VOIP_WPF
             InitializeCall();
         }
 
+        private void InitializeCall()
+        {
+            try
+            {
+                //Start listening on port 1500.
+                udpClient = new UdpClient("192.168.1.107", 1550);
+
+                senderThread = new Thread(new ThreadStart(Send));
+                senderThread.Start();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    "VoiceChat-InitializeCall ()", MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            }
+        }
+
+        private void Send()
+        {
+            try
+            {
+                //while (true)
+                //{
+                //    byte[] data = File.ReadAllBytes("dd.jpg");
+                //    udpClient.Send(data, data.Length);
+                //    break;//Thread.Sleep(1000);
+                //}
+
+                capture = new WasapiCapture();
+                capture.Initialize();
+                w = new WaveWriter("dump.wav", capture.WaveFormat);
+
+                capture.DataAvailable += (s, e) =>
+                {
+                //save the recorded audio
+                w.Write(e.Data, e.Offset, e.ByteCount);
+
+                //Send into Udp
+                udpClient.Send(e.Data, e.ByteCount);
+
+                //log
+                //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
+                };
+
+                //start recording
+                capture.Start();
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine("Sender packets stops");
+            }
+        }
+
+
+        private void Disconnect(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                //Start listening on port 1500.
+                udpClient = new UdpClient("192.168.1.107", 1550);
+
+                receiverThread = new Thread(new ThreadStart(Receive));
+                receiverThread.Start();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    "VoiceChat-InitializeCall Rec()", MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            }
+        }
+
+        private void Receive()
+        {
+            try
+            {
+                var IP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
+
+                capture = new WasapiCapture();
+                capture.Initialize();
+                w = new WaveWriter("Rec.wav", capture.WaveFormat);
+
+                while (true)
+                {
+                    byte[] byteData = udpClient.Receive(ref IP);
+                    Console.WriteLine("==> Received : " + byteData.Length);
+                    w.Write(byteData, 0, byteData.Length);
+                    if (!flag) return;
+                }
+            }
+            catch (ThreadAbortException)
+            {
+                Console.WriteLine("Receiver packets stops");
+            }
+        }
+
+
+
         #region CSCore
         void StopPlaying()
         {
@@ -57,6 +156,7 @@ namespace VOIP_WPF
             stream.Dispose();
         }
 
+        //Recording
         void tt()
         {
             capture = new WasapiCapture();
@@ -130,78 +230,6 @@ namespace VOIP_WPF
         }
 #endregion
 
-
-
-        private void InitializeCall()
-        {
-            try
-            {
-                //Start listening on port 1500.
-                udpClient = new UdpClient("192.168.1.107",1550);
-
-                Thread senderThread = new Thread(new ThreadStart(Send));
-                senderThread.Start();
-
-                //Thread receiverThread = new Thread(new ThreadStart(Receive));
-                //receiverThread.Start();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message,
-                    "VoiceChat-InitializeCall ()", MessageBoxButton.OK,
-                MessageBoxImage.Error);
-            }
-        }
-
-        private void Receive()
-        {
-            var IP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
-
-            capture = new WasapiCapture();
-            capture.Initialize();
-            w = new WaveWriter("Rec.wav", capture.WaveFormat);
-
-            while (true)
-            {
-                byte[] byteData = udpClient.Receive(ref IP);
-                Console.WriteLine("==> Received : " + byteData.Length);
-                w.Write(byteData, 0, byteData.Length);
-                if (!flag) return;
-            }
-        }
-
-        private void Send()
-        {
-            //while (true)
-            //{
-            //    byte[] data = File.ReadAllBytes("dd.jpg");
-            //    udpClient.Send(data, data.Length);
-            //    break;//Thread.Sleep(1000);
-            //}
-
-            capture = new WasapiCapture();
-            capture.Initialize();
-            w = new WaveWriter("dump.wav", capture.WaveFormat);
-
-            capture.DataAvailable += (s, e) =>
-            {
-                //save the recorded audio
-                w.Write(e.Data, e.Offset, e.ByteCount);
-
-                //Send into Udp
-                udpClient.Send(e.Data, e.ByteCount);
-
-                //log
-                //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
-            };
-
-            //start recording
-            capture.Start();
-        }
-
-
-
-
         //private byte[] Combine(params byte[][] arrays)
         //{
         //    byte[] rv = new byte[arrays.Sum(a => a.Length)];
@@ -214,23 +242,22 @@ namespace VOIP_WPF
         //    return rv;
         //}
 
-        private void Disconnect(object sender, RoutedEventArgs e)
+        private void test_Send(object sender, RoutedEventArgs e)
         {
-            flag = false;
-
-            Thread.Sleep(500);
-
             //stop recording
             capture.Stop();
             capture.Dispose();
-            
+
             //Release File
             w.Dispose();
-        }
 
-        private void test_Send(object sender, RoutedEventArgs e)
-        {
-
+            //StopThreads:
+            try
+            {
+                senderThread.Abort();
+                senderThread.Abort();
+            }
+            catch (Exception ex) { Console.WriteLine("#ERROR : " + ex.StackTrace); }
         }
     }
 }

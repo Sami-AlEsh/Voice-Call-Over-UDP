@@ -14,9 +14,9 @@
 
         <TextBox Margin="10" />
         <StackPanel Orientation="Horizontal" Grid.Row="1">
-            <Button Content="Call" Width="80" Click="Connect_Btn"/>
-            <Button Content="Drop" Width="82" Click="Disconnect"/>
-            <Button Content="Do" Width="80" Click="test_Send"/>
+            <Button Content="Caller" Width="80" Click="Connect_Btn"/>
+            <Button Content="Listener" Width="82" Click="Disconnect"/>
+            <Button Content="Test" Width="80" Click="test_Send"/>
         </StackPanel>
 
     </Grid>
