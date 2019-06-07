@@ -14,6 +14,7 @@ using CSCore.Codecs.MP3;
 using CSCore.CoreAudioAPI;
 using System.Linq;
 using System.Threading;
+using System.Media;
 
 namespace VOIP_WPF
 {
@@ -22,19 +23,22 @@ namespace VOIP_WPF
     /// </summary>
     public partial class MainWindow : Window
     {
-        UdpClient udpClient;
+        IPEndPoint IP_HP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
+        IPEndPoint IP_TOSHIBA = new IPEndPoint(IPAddress.Parse("192.168.1.107"), 1550);
+        UdpClient udpClient_Send;
+        UdpClient udpClient_Rec;
 
         Thread senderThread;
         Thread receiverThread;
+        
         //Record
-        WasapiCapture capture;
-        //Listen
-        ISoundOut soundOut;
-        FileStream stream;
-        WaveWriter w;
+        WasapiCapture capture_mic;
 
-        //test 
-        bool flag = true;
+        //?
+        WaveWriter w_sender;
+
+        //
+        SoundPlayer player = new SoundPlayer();
 
         public MainWindow()
         {
@@ -42,17 +46,14 @@ namespace VOIP_WPF
             //Task.Factory.StartNew(new Action(tt));
         }
 
+        //# 1 #
         private void Connect_Btn(object sender, RoutedEventArgs e)
-        {
-            InitializeCall();
-        }
-
-        private void InitializeCall()
         {
             try
             {
+                Console.WriteLine(IP_TOSHIBA.Address.ToString());
                 //Start listening on port 1500.
-                udpClient = new UdpClient("192.168.1.107", 1550);
+                udpClient_Send = new UdpClient(IP_TOSHIBA.Address.ToString(), 1550);
 
                 senderThread = new Thread(new ThreadStart(Send));
                 senderThread.Start();
@@ -64,50 +65,44 @@ namespace VOIP_WPF
                 MessageBoxImage.Error);
             }
         }
-
         private void Send()
         {
             try
             {
-                //while (true)
-                //{
-                //    byte[] data = File.ReadAllBytes("dd.jpg");
-                //    udpClient.Send(data, data.Length);
-                //    break;//Thread.Sleep(1000);
-                //}
+                capture_mic = new WasapiCapture();
+                capture_mic.Initialize();
+                w_sender = new WaveWriter("0send.wav", capture_mic.WaveFormat);
 
-                capture = new WasapiCapture();
-                capture.Initialize();
-                w = new WaveWriter("dump.wav", capture.WaveFormat);
-
-                capture.DataAvailable += (s, e) =>
+                capture_mic.DataAvailable += (s, e) =>
                 {
                     //save the recorded audio
-                    w.Write(e.Data, e.Offset, e.ByteCount);
+                    w_sender.Write(e.Data, e.Offset, e.ByteCount);
 
                     //Send into Udp
-                    udpClient.Send(e.Data, e.ByteCount);
+                    udpClient_Send.Send(e.Data, e.Data.Length);
 
                     //log
                     //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
                 };
 
                 //start recording
-                capture.Start();
+                capture_mic.Start();
             }
             catch (ThreadAbortException)
             {
-                Console.WriteLine("Sender packets stops");
+                Console.WriteLine("Sender Thread stops");
+                return;
             }
         }
 
 
+        //# 2 #
         private void Disconnect(object sender, RoutedEventArgs e)
         {
             try
             {
                 //Start listening on port 1500.
-                udpClient = new UdpClient("192.168.1.105", 1550);
+                udpClient_Rec = new UdpClient(IP_HP.Address.ToString(), 1550);
 
                 receiverThread = new Thread(new ThreadStart(Receive));
                 receiverThread.Start();
@@ -119,85 +114,86 @@ namespace VOIP_WPF
                 MessageBoxImage.Error);
             }
         }
-
         private void Receive()
         {
             try
             {
-                var IP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
-
-                capture = new WasapiCapture();
-                capture.Initialize();
-                w = new WaveWriter("Rec.wav", capture.WaveFormat);
-
+                //capture_mic = new WasapiCapture();
+                //capture_mic.Initialize();
+                //w = new WaveWriter("Rec.wav", capture_mic.WaveFormat);
+                
                 while (true)
                 {
-                    byte[] byteData = udpClient.Receive(ref IP);
+                    byte[] byteData = udpClient_Rec.Receive(ref IP_HP);
                     Console.WriteLine("==> Received : " + byteData.Length);
-                    w.Write(byteData, 0, byteData.Length);
-                    if (!flag) return;
+
+                    PlayASound2(new MemoryStream(byteData));
+                    
+                    //Write received voice to a file
+                    //w.Write(byteData, 0, byteData.Length);
                 }
             }
             catch (ThreadAbortException)
             {
-                Console.WriteLine("Receiver packets stops");
+                Console.WriteLine("Receiver Thread stops");
+                return;
             }
         }
 
 
 
         #region CSCore
-        void StopPlaying()
-        {
-            Thread.Sleep(5000);
 
-            //Stop the playback
-            soundOut.Stop();
-            stream.Dispose();
+
+        public void PlayASound2(Stream s)
+        {
+            player.Stream = s;
+            player.PlaySync();
+            player.Dispose();
         }
 
-        //Recording
-        void tt()
+        public void PlayASound(Stream stream)
         {
-            capture = new WasapiCapture();
-            
-            //if nessesary, you can choose a device here
-            //to do so, simply set the device property of the capture to any MMDevice
-            //to choose a device, take a look at the sample here: http://cscore.codeplex.com/
-
-            //initialize the selected device for recording
-            capture.Initialize();
-
-            //create a wavewriter to write the data to
-            WaveWriter w = new WaveWriter("dump.wav", capture.WaveFormat);
-                
-            //setup an eventhandler to receive the recorded data
-            capture.DataAvailable += (s, e) =>
-            {
-                //save the recorded audio
-                w.Write(e.Data, e.Offset, e.ByteCount);
-            };
-
-            //start recording
-            capture.Start();
-            
-        }
-
-        
-        public void PlayASound()
-        {
-            stream = File.Open(@"dump.mp3",FileMode.Open);
             //Contains the sound to play
-            IWaveSource soundSource = GetSoundSource(stream);
-            //SoundOut implementation which plays the sound
-            soundOut = GetSoundOut();
-            
-            //Tell the SoundOut which sound it has to play
-            soundOut.Initialize(soundSource);
-            //Play the sound
-            soundOut.Play();
+            using (IWaveSource soundSource = GetSoundSource(stream))
+            {
+                //SoundOut implementation which plays the sound
+                using (ISoundOut soundOut = GetSoundOut())
+                {
+                    //Tell the SoundOut which sound it has to play
+                    soundOut.Initialize(soundSource);
+                    //Play the sound
+                    soundOut.Play();
 
+                    while (soundOut.PlaybackState == PlaybackState.Playing)
+                    {
+                        Thread.Sleep(100);
+                    }
+
+                    //Stop the playback
+                    soundOut.Stop();
+                }
+            }
         }
+        //public void PlayASound(Stream stream)
+        //{
+        //    //Contains the sound to play
+        //    IWaveSource soundSource = GetSoundSource(stream);
+        //    //SoundOut implementation which plays the sound
+        //    soundOut = GetSoundOut();
+
+        //    //Tell the SoundOut which sound it has to play
+        //    soundOut.Initialize(soundSource);
+        //    //Play the sound
+        //    soundOut.Play();
+
+        //    while (soundOut.PlaybackState == PlaybackState.Playing)
+        //    {
+        //        Thread.Sleep(100);
+        //    }
+        //    soundOut.Stop();
+
+        //}
 
         private ISoundOut GetSoundOut()
         {
@@ -209,14 +205,12 @@ namespace VOIP_WPF
             else
                 return new DirectSoundOut();
         }
-
         private IWaveSource GetSoundSource(Stream stream)
         {
             // Instead of using the CodecFactory as helper, you specify the decoder directly:
             return new DmoMp3Decoder(stream);
 
         }
-
         public static MMDevice GetDevice()
         {
             using (var mmdeviceEnumerator = new MMDeviceEnumerator())
@@ -230,6 +224,36 @@ namespace VOIP_WPF
         }
 #endregion
 
+        
+
+        //# 3 #
+        private void test_Send(object sender, RoutedEventArgs e)
+        {
+            //StopThreads:
+            try
+            {
+                if (senderThread == null && receiverThread == null) { Console.WriteLine("No Threads to stop !"); return; }
+
+                if (senderThread != null && senderThread.IsAlive) { senderThread.Abort(); Console.WriteLine("Sender Thread Stopped"); }
+                if (receiverThread != null && receiverThread.IsAlive) { receiverThread.Abort(); Console.WriteLine("Receiver Thread Stopped"); }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("#ERROR : " + ex.StackTrace);
+            }
+            finally
+            {
+                if(w_sender!= null && !w_sender.IsDisposed) w_sender.Dispose();
+
+                if (capture_mic != null)
+                {
+                    Console.WriteLine("Capture stopped.");
+                    capture_mic.Stop();
+                }
+            }
+        }
+
+
         //private byte[] Combine(params byte[][] arrays)
         //{
         //    byte[] rv = new byte[arrays.Sum(a => a.Length)];
@@ -242,22 +266,5 @@ namespace VOIP_WPF
         //    return rv;
         //}
 
-        private void test_Send(object sender, RoutedEventArgs e)
-        {
-            //stop recording
-            capture.Stop();
-            capture.Dispose();
-
-            //Release File
-            w.Dispose();
-
-            //StopThreads:
-            try
-            {
-                if(senderThread.IsAlive) senderThread.Abort();
-                if(receiverThread.IsAlive) receiverThread.Abort();
-            }
-            catch (Exception ex) { Console.WriteLine("#ERROR : " + ex.StackTrace); }
-        }
     }
 }
