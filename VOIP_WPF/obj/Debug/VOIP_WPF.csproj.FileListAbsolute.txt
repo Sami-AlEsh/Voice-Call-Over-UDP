@@ -18,3 +18,5 @@ C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VO
 C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.csproj.GenerateResource.Cache
 C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.exe
 C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.pdb
+C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\bin\Debug\NAudio.dll
+C:\Users\hp\documents\visual studio 2015\Projects\VOIP_WPF\VOIP_WPF\bin\Debug\NAudio.xml
