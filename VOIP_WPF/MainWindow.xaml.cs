@@ -15,6 +15,7 @@ using CSCore.CoreAudioAPI;
 using System.Linq;
 using System.Threading;
 using System.Media;
+using System.Text;
 
 namespace VOIP_WPF
 {
@@ -23,10 +24,11 @@ namespace VOIP_WPF
     /// </summary>
     public partial class MainWindow : Window
     {
-        IPEndPoint IP_HP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
-        IPEndPoint IP_TOSHIBA = new IPEndPoint(IPAddress.Parse("192.168.1.107"), 1550);
-        UdpClient udpClient_Send;
-        UdpClient udpClient_Rec;
+        //IPEndPoint IP_HP = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
+        //IPEndPoint IP_TOSHIBA = new IPEndPoint(IPAddress.Parse("192.168.1.107"), 1550);
+
+        TcpClient Client1;
+        TcpClient Client2;
 
         Thread senderThread;
         Thread receiverThread;
@@ -34,55 +36,52 @@ namespace VOIP_WPF
         //Record
         WasapiCapture capture_mic;
 
-        //?
+        //Wave Writer to save recorded sound
         WaveWriter w_sender;
-
-        //
-        SoundPlayer player = new SoundPlayer();
+        WaveWriter w_receiver;
 
         public MainWindow()
         {
             InitializeComponent();
-            //Task.Factory.StartNew(new Action(tt));
+
+            //Init Sockets Mic and Files:
+            //Client1 = new TcpClient("192.168.1.105", 1550);
+            //Client2 = new TcpClient("192.168.1.105", 1550);
+
+            capture_mic = new WasapiCapture();
+            capture_mic.Initialize();
+
+            WaveFormat f = capture_mic.WaveFormat;
+
+            w_sender = new WaveWriter("0send.wav", f);
+            w_receiver = new WaveWriter("1rec.wav", f);
         }
 
         //# 1 #
         private void Connect_Btn(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                Console.WriteLine(IP_TOSHIBA.Address.ToString());
-                //Start listening on port 1500.
-                udpClient_Send = new UdpClient(IP_TOSHIBA.Address.ToString(), 1550);
-
-                senderThread = new Thread(new ThreadStart(Send));
-                senderThread.Start();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message,
-                    "VoiceChat-InitializeCall ()", MessageBoxButton.OK,
-                MessageBoxImage.Error);
-            }
+            senderThread = new Thread(new ThreadStart(Sen)); senderThread.Start();
         }
-        private void Send()
+        private void Disconnect(object sender, RoutedEventArgs e)
+        {
+            receiverThread = new Thread(new ThreadStart(Rec)); receiverThread.Start();
+        }
+
+        private void Sen()
         {
             try
             {
-                capture_mic = new WasapiCapture();
-                capture_mic.Initialize();
-                w_sender = new WaveWriter("0send.wav", capture_mic.WaveFormat);
+                //---create a TCPClient object at the IP and port no.---
+                TcpClient client = new TcpClient("127.0.0.1", 1550);
+                NetworkStream nwStream = client.GetStream();
 
                 capture_mic.DataAvailable += (s, e) =>
                 {
                     //save the recorded audio
                     w_sender.Write(e.Data, e.Offset, e.ByteCount);
 
-                    //Send into Udp
-                    udpClient_Send.Send(e.Data, e.Data.Length);
-
-                    //log
-                    //Console.WriteLine("Length " + e.ByteCount + "   ByteCounts "+e.ByteCount);
+                    //Send into TCP
+                    nwStream.Write(e.Data,0 , e.Data.Length);
                 };
 
                 //start recording
@@ -90,6 +89,33 @@ namespace VOIP_WPF
             }
             catch (ThreadAbortException)
             {
+                capture_mic.Stop();
+                w_sender.Dispose();
+                capture_mic.Dispose();
+                Console.WriteLine("Sender Aborted");
+            }
+        }
+        private void Send()
+        {
+            try
+            {
+                capture_mic.DataAvailable += (s, e) =>
+                {
+                    //save the recorded audio
+                    w_sender.Write(e.Data, e.Offset, e.ByteCount);
+
+                    //Send into Udp
+                    //Client1.Send(e.Data, e.Data.Length);
+                };
+
+                //start recording
+                capture_mic.Start();
+            }
+            catch (ThreadAbortException)
+            {
+                capture_mic.Stop();
+                w_sender.Dispose();
+                capture_mic.Dispose();
                 Console.WriteLine("Sender Thread stops");
                 return;
             }
@@ -97,44 +123,56 @@ namespace VOIP_WPF
 
 
         //# 2 #
-        private void Disconnect(object sender, RoutedEventArgs e)
+        private void Rec()
         {
             try
             {
-                //Start listening on port 1500.
-                udpClient_Rec = new UdpClient(IP_HP.Address.ToString(), 1550);
+                //---listen at the specified IP and port no.---
+                IPAddress localAdd = IPAddress.Parse("127.0.0.1");
+                TcpListener listener = new TcpListener(localAdd, 1550);
+                Console.WriteLine("Listening...");
+                listener.Start();
 
-                receiverThread = new Thread(new ThreadStart(Receive));
-                receiverThread.Start();
+                //---incoming client connected---
+                TcpClient client = listener.AcceptTcpClient();
+                //---get the incoming data through a network stream---
+                NetworkStream nwStream = client.GetStream();
+                byte[] buffer = new byte[client.ReceiveBufferSize];
+
+                while(true)
+                {
+                    //---read incoming stream---
+                    int bytesRead = nwStream.Read(buffer, 0, client.ReceiveBufferSize);
+
+                    //---convert the data received into a string---
+                    byte[] data = buffer.Take(bytesRead).ToArray();
+                    Console.WriteLine("==> Received : " + data.Length);
+
+                    w_receiver.Write(data, 0, data.Length);
+                }
             }
-            catch (Exception ex)
+            catch (ThreadAbortException)
             {
-                MessageBox.Show(ex.Message,
-                    "VoiceChat-InitializeCall Rec()", MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                Console.WriteLine("REC Aborted");
             }
         }
         private void Receive()
         {
             try
             {
-                //capture_mic = new WasapiCapture();
-                //capture_mic.Initialize();
-                //w = new WaveWriter("Rec.wav", capture_mic.WaveFormat);
-                
+                var ip = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
                 while (true)
                 {
-                    byte[] byteData = udpClient_Rec.Receive(ref IP_HP);
-                    Console.WriteLine("==> Received : " + byteData.Length);
-
-                    PlayASound2(new MemoryStream(byteData));
+                    //byte[] byteData = Client2.ReceiveBufferSize(ref ip);
+                    //Console.WriteLine("==> Received data : " + byteData.Length);
                     
                     //Write received voice to a file
-                    //w.Write(byteData, 0, byteData.Length);
+                    //w_receiver.Write(byteData, 0, byteData.Length);
                 }
             }
             catch (ThreadAbortException)
             {
+                w_receiver.Dispose();
                 Console.WriteLine("Receiver Thread stops");
                 return;
             }
@@ -147,9 +185,9 @@ namespace VOIP_WPF
 
         public void PlayASound2(Stream s)
         {
-            player.Stream = s;
-            player.PlaySync();
-            player.Dispose();
+            //player.Stream = s;
+            //player.PlaySync();
+            //player.Dispose();
         }
 
         public void PlayASound(Stream stream)
@@ -234,22 +272,12 @@ namespace VOIP_WPF
             {
                 if (senderThread == null && receiverThread == null) { Console.WriteLine("No Threads to stop !"); return; }
 
-                if (senderThread != null && senderThread.IsAlive) { senderThread.Abort(); Console.WriteLine("Sender Thread Stopped"); }
-                if (receiverThread != null && receiverThread.IsAlive) { receiverThread.Abort(); Console.WriteLine("Receiver Thread Stopped"); }
+                if (senderThread   != null && senderThread.IsAlive  ) senderThread.Abort();
+                if (receiverThread != null && receiverThread.IsAlive) receiverThread.Abort();
             }
             catch (Exception ex)
             {
                 Console.WriteLine("#ERROR : " + ex.StackTrace);
-            }
-            finally
-            {
-                if(w_sender!= null && !w_sender.IsDisposed) w_sender.Dispose();
-
-                if (capture_mic != null)
-                {
-                    Console.WriteLine("Capture stopped.");
-                    capture_mic.Stop();
-                }
             }
         }
 
