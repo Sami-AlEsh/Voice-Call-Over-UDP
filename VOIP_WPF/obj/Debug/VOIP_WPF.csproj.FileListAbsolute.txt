@@ -19,3 +19,4 @@ C:\Users\hp\Documents\Visual Studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VO
 C:\Users\hp\Documents\Visual Studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.exe
 C:\Users\hp\Documents\Visual Studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.pdb
 C:\Users\hp\Documents\Visual Studio 2015\Projects\VOIP_WPF\VOIP_WPF\bin\Debug\VOIP_WPF.pdb
+C:\Users\hp\Documents\Visual Studio 2015\Projects\VOIP_WPF\VOIP_WPF\obj\Debug\VOIP_WPF.csprojResolveAssemblyReference.cache
