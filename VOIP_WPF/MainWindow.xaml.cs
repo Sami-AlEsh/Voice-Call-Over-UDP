@@ -41,7 +41,7 @@ namespace VOIP_WPF
         //# 1 #
         private void Connect_Btn(object sender, RoutedEventArgs e)
         {
-            updSender   = new UdpClient("192.168.1.105", 1550);
+            updSender   = new UdpClient("192.168.1.107", 1550);
 
             ///////
 
@@ -95,13 +95,13 @@ namespace VOIP_WPF
             {
                 try
                 {
-                    var ip = new IPEndPoint(IPAddress.Parse("192.168.1.105"), 1550);
+                    var ip = new IPEndPoint(IPAddress.Any, 1550);
                     udpReceiver = new UdpClient(ip);
                     waveOut = new WaveOut();
                     waveProvider = new BufferedWaveProvider(new WaveFormat(44100, 1));
                     waveOut.Init(waveProvider);
                     waveOut.Play();
-                    waveFileR = new WaveFileWriter(@"1_receive.wav", waveSource.WaveFormat);
+                    waveFileR = new WaveFileWriter(@"1_receive.wav", new WaveFormat(44100, 1));
 
                     while (true)
                     {
